@@ -1,0 +1,59 @@
+FIND:
+
+set cif_status='ZC',ZIP_CREATED_DATE = sysdate,
+
+REPLACE with:
+
+set cif_status='ZC', uploaded_lcpc = nvl(uploaded_lcpc, lcpc), ZIP_CREATED_DATE = sysdate,
+
+Edit 2: the ZC history, in insertHistory
+
+FIND the two SQL lines:
+
+Insert into kycupdate.kyc_perfios_history (cif_number,Account_number,ZIP_FILE,modified_date,Remark,server,modified_by) 
+values (?,?,?,sysdate,'Zip Created succesfully','','Zip_Creation_Utility')
+
+REPLACE with:
+
+Insert into kycupdate.kyc_perfios_history (cif_number,Account_number,ZIP_FILE,modified_date,Remark,server,modified_by,uploaded_lcpc) 
+values (?,?,?,sysdate,'Zip Created succesfully','','Zip_Creation_Utility',
+       (select max(nvl(uploaded_lcpc, lcpc)) from kycupdate.kyc_perfios_customer_details where cif_number = ?))
+
+Then, in the same method, FIND:
+
+new Object[] {p.cifNumber(),p.accountNumber(),lotName,}
+
+REPLACE with:
+
+new Object[] {p.cifNumber(),p.accountNumber(),lotName,p.cifNumber()}
+
+Edit 3: the ZF update and history, in updateZipFailed
+
+FIND:
+
++ "set cif_status='ZF', modified_date=sysdate, remark=? "
+
+REPLACE with:
+
++ "set cif_status='ZF', uploaded_lcpc = nvl(uploaded_lcpc, lcpc), modified_date=sysdate, remark=? "
+
+FIND:
+
++ "(cif_number, Account_number, ZIP_FILE, modified_date, Remark, server, modified_by) "
++ "values (?,?,?,sysdate,?,?,'Zip_Creation_Utility')";
+
+REPLACE with:
+
++ "(cif_number, Account_number, ZIP_FILE, modified_date, Remark, server, modified_by, uploaded_lcpc) "
++ "values (?,?,?,sysdate,?,?,'Zip_Creation_Utility', "
++ "(select max(nvl(uploaded_lcpc, lcpc)) from kycupdate.kyc_perfios_customer_details where cif_number = ?))";
+
+FIND:
+
+jdbcTemplate.update(historySql, cifNumber, accountNumber, null, remark,
+        ServerConfiguration.Hostname);
+
+REPLACE with:
+
+jdbcTemplate.update(historySql, cifNumber, accountNumber, null, remark,
+        ServerConfiguration.Hostname, cifNumber);
